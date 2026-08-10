@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  color: #f8fafc;
+  background: #050505;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(212, 175, 55, 0.08), transparent 30%),
+    radial-gradient(circle at 85% 90%, rgba(212, 175, 55, 0.05), transparent 30%),
+    #050505;
+}

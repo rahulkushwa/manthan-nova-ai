@@ -1,182 +1,417 @@
-import { Sparkles, ArrowUp, Plus } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
+
+import ChatHeader from "./components/chat/layout/ChatHeader";
+import ChatSidebar from "./components/chat/sidebar/ChatSidebar";
+
+import ClassSelector from "./components/chat/ClassSelector";
+import WelcomeScreen from "./components/chat/WelcomeScreen";
+import ChatMessages from "./components/chat/ChatMessages";
+import ChatInput from "./components/chat/ChatInput";
+import DeleteConfirmModal from "./components/chat/DeleteConfirmModal";
+
+import { askTutor } from "./services/api";
+import useConversations from "./hooks/useConversations";
+
 
 function App() {
-  const suggestions = [
-    "Explain Newton's laws",
-    "Solve a maths problem",
-    "Quiz me on biology",
-  ];
+  // Persistent anonymous user ID
+  const [userId] = useState(() => {
+    const savedUserId = localStorage.getItem(
+      "manthan_nova_user_id"
+    );
+
+    if (savedUserId) {
+      return savedUserId;
+    }
+
+    const newUserId = crypto.randomUUID();
+
+    localStorage.setItem(
+      "manthan_nova_user_id",
+      newUserId
+    );
+
+    return newUserId;
+  });
+
+
+  // Selected class
+  const [classLevel, setClassLevel] = useState(() => {
+    const savedClass = localStorage.getItem(
+      "manthan_nova_class"
+    );
+
+    return savedClass ? Number(savedClass) : null;
+  });
+
+
+  // Current conversation
+  const [conversationId, setConversationId] = useState(() => {
+    return crypto.randomUUID();
+  });
+
+
+  // Chat messages
+  const [messages, setMessages] = useState([]);
+
+
+  // AI loading state
+  const [isLoading, setIsLoading] = useState(false);
+
+
+  // Mobile sidebar state
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] =
+    useState(false);
+
+
+  // Delete modal state
+  const [
+    conversationToDelete,
+    setConversationToDelete,
+  ] = useState(null);
+
+
+  const [isDeleting, setIsDeleting] =
+    useState(false);
+
+
+  // Conversation history
+  const {
+    conversations,
+    isLoadingHistory,
+    loadConversations,
+    loadConversationMessages,
+    removeConversation,
+  } = useConversations(userId);
+
+
+  const handleSelectClass = (selectedClass) => {
+    setClassLevel(selectedClass);
+
+    localStorage.setItem(
+      "manthan_nova_class",
+      selectedClass.toString()
+    );
+  };
+
+
+  const handleNewChat = () => {
+    setConversationId(crypto.randomUUID());
+
+    setMessages([]);
+
+    setIsMobileSidebarOpen(false);
+  };
+
+
+  const handleSelectConversation = async (
+    conversation
+  ) => {
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+
+      const conversationMessages =
+        await loadConversationMessages(
+          conversation.id
+        );
+
+      setConversationId(conversation.id);
+
+      setMessages(conversationMessages);
+
+      setIsMobileSidebarOpen(false);
+
+    } catch (error) {
+      console.error(
+        "Could not load conversation:",
+        error
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // Open delete confirmation modal
+  const handleDeleteConversation = (
+    conversationIdToDelete
+  ) => {
+    if (isLoading || isDeleting) return;
+
+    setConversationToDelete(
+      conversationIdToDelete
+    );
+  };
+
+
+  // Close delete confirmation modal
+  const handleCloseDeleteModal = () => {
+    if (isDeleting) return;
+
+    setConversationToDelete(null);
+  };
+
+
+  // Confirm and delete conversation
+  const handleConfirmDelete = async () => {
+    if (!conversationToDelete) return;
+
+    try {
+      setIsDeleting(true);
+
+      await removeConversation(
+        conversationToDelete
+      );
+
+      // If the active conversation was deleted,
+      // create a new empty chat.
+      if (
+        conversationId ===
+        conversationToDelete
+      ) {
+        setConversationId(
+          crypto.randomUUID()
+        );
+
+        setMessages([]);
+      }
+
+      // Close mobile sidebar after deletion.
+      setIsMobileSidebarOpen(false);
+
+      // Close modal.
+      setConversationToDelete(null);
+
+    } catch (error) {
+      console.error(
+        "Could not delete conversation:",
+        error
+      );
+
+      alert(
+        "Could not delete the conversation. Please try again."
+      );
+
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
+  const handleSendMessage = async (question) => {
+    if (!question.trim() || isLoading) return;
+
+    const userMessage = {
+      role: "user",
+      content: question,
+    };
+
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      userMessage,
+    ]);
+
+    setIsLoading(true);
+
+    try {
+      const result = await askTutor({
+        user_id: userId,
+        conversation_id: conversationId,
+        question,
+        class_level: classLevel,
+        subject: "General",
+        mode: "explain",
+      });
+
+      const assistantMessage = {
+        role: "assistant",
+        content: result.answer,
+      };
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        assistantMessage,
+      ]);
+
+      await loadConversations();
+
+    } catch (error) {
+      console.error(error);
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "assistant",
+          content:
+            "Sorry, something went wrong. Please try again.",
+        },
+      ]);
+
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // Show class selection only for first-time users
+  if (!classLevel) {
+    return (
+      <ClassSelector
+        selectedClass={classLevel}
+        onSelectClass={handleSelectClass}
+      />
+    );
+  }
+
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <main className="flex h-screen overflow-hidden bg-black text-white">
 
-        {/* Header */}
-        <header className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 sm:h-10 sm:w-10">
-              <Sparkles className="h-4 w-4 text-amber-400 sm:h-5 sm:w-5" />
-            </div>
-
-            <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold sm:text-lg">
-                Manthan Nova AI
-              </h1>
-
-              <p className="hidden text-xs text-zinc-500 sm:block">
-                Your AI learning assistant
-              </p>
-            </div>
-          </div>
-
-          <button
-            className="
-              flex shrink-0 items-center gap-2
-              rounded-xl border border-white/10
-              bg-white/5 px-3 py-2
-              text-xs font-medium text-zinc-300
-              transition hover:bg-white/10
-              sm:px-4 sm:py-2.5 sm:text-sm
-            "
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden xs:inline sm:inline">
-              New Chat
-            </span>
-          </button>
-        </header>
-
-        {/* Main */}
-        <section className="flex flex-1 items-center justify-center py-10 sm:py-16 lg:py-20">
-          <div className="w-full max-w-3xl text-center">
-
-            {/* AI Badge */}
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/5 px-3 py-1.5 text-xs text-amber-300 sm:mb-6 sm:px-4 sm:py-2 sm:text-sm">
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              AI Tutor
-            </div>
-
-            {/* Heading */}
-            <h2 className="
-              text-3xl font-bold leading-tight tracking-tight
-              sm:text-5xl
-              lg:text-6xl
-            ">
-              Learn smarter with{" "}
-              <span className="text-amber-400">
-                Manthan Nova AI
-              </span>
-            </h2>
-
-            {/* Description */}
-            <p className="
-              mx-auto mt-4 max-w-xl
-              px-2 text-sm leading-6 text-zinc-400
-              sm:mt-5 sm:px-0 sm:text-base sm:leading-7
-            ">
-              Ask questions, understand difficult concepts,
-              practice topics, and learn at your own level.
-            </p>
-
-            {/* Input */}
-            <div className="
-              mx-auto mt-7 w-full max-w-2xl
-              rounded-2xl border border-white/10
-              bg-white/[0.04] p-2
-              shadow-2xl
-              sm:mt-10 sm:p-3
-            ">
-              <div className="flex items-center gap-2">
-
-                <input
-                  type="text"
-                  placeholder="Ask Manthan Nova AI..."
-                  className="
-                    min-w-0 flex-1
-                    bg-transparent
-                    px-2.5 py-3
-                    text-sm text-white
-                    outline-none
-                    placeholder:text-zinc-600
-                    sm:px-3 sm:py-3
-                  "
-                />
-
-                {/* Desktop button */}
-                <button
-                  className="
-                    hidden shrink-0
-                    items-center gap-2
-                    rounded-xl
-                    bg-amber-400
-                    px-5 py-3
-                    text-sm font-semibold text-black
-                    transition hover:bg-amber-300
-                    sm:flex
-                  "
-                >
-                  Ask AI
-                </button>
-
-                {/* Mobile button */}
-                <button
-                  className="
-                    flex h-10 w-10
-                    shrink-0 items-center justify-center
-                    rounded-xl
-                    bg-amber-400
-                    text-black
-                    transition hover:bg-amber-300
-                    sm:hidden
-                  "
-                  aria-label="Ask AI"
-                >
-                  <ArrowUp className="h-5 w-5" />
-                </button>
-
-              </div>
-            </div>
-
-            {/* Suggestions */}
-            <div className="
-              mt-4 flex
-              gap-2 overflow-x-auto
-              px-1 pb-2
-              sm:mt-5
-              sm:flex-wrap sm:justify-center
-              sm:overflow-visible sm:px-0 sm:pb-0
-            ">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  className="
-                    shrink-0 whitespace-nowrap
-                    rounded-full
-                    border border-white/10
-                    bg-white/[0.03]
-                    px-3 py-2
-                    text-[11px] text-zinc-400
-                    transition
-                    hover:border-amber-400/30
-                    hover:text-amber-300
-                    sm:px-4 sm:text-xs
-                  "
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-
-            {/* Mobile helper */}
-            <p className="mt-7 text-[11px] text-zinc-600 sm:mt-8">
-              Manthan Nova AI can make mistakes. Check important answers.
-            </p>
-
-          </div>
-        </section>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <ChatSidebar
+          conversations={conversations}
+          activeConversationId={conversationId}
+          onSelectConversation={
+            handleSelectConversation
+          }
+          onNewChat={handleNewChat}
+          onDeleteConversation={
+            handleDeleteConversation
+          }
+          isLoading={isLoadingHistory}
+        />
       </div>
+
+
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-0 z-50 md:hidden transition-all duration-300 ${
+          isMobileSidebarOpen
+            ? "visible"
+            : "invisible"
+        }`}
+      >
+
+        {/* Animated Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black transition-opacity duration-300 ${
+            isMobileSidebarOpen
+              ? "opacity-70"
+              : "opacity-0"
+          }`}
+          onClick={() =>
+            setIsMobileSidebarOpen(false)
+          }
+        />
+
+
+        {/* Animated Sidebar Drawer */}
+        <div
+          className={`absolute inset-y-0 left-0 w-72 transform shadow-2xl transition-transform duration-300 ease-out ${
+            isMobileSidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }`}
+        >
+
+          {/* Close Button */}
+          <button
+            onClick={() =>
+              setIsMobileSidebarOpen(false)
+            }
+            className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-zinc-400 backdrop-blur transition hover:bg-white/10 hover:text-white"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+
+          <ChatSidebar
+            conversations={conversations}
+            activeConversationId={conversationId}
+            onSelectConversation={
+              handleSelectConversation
+            }
+            onNewChat={handleNewChat}
+            onDeleteConversation={
+              handleDeleteConversation
+            }
+            isLoading={isLoadingHistory}
+          />
+
+        </div>
+
+      </div>
+
+
+      {/* Main Chat Area */}
+      <div className="flex min-w-0 flex-1 flex-col">
+
+        <ChatHeader
+          onNewChat={handleNewChat}
+          onOpenSidebar={() =>
+            setIsMobileSidebarOpen(true)
+          }
+        />
+
+
+        {/* Chat Content */}
+        <div className="flex min-h-0 flex-1 flex-col">
+
+          <div className="flex min-h-0 flex-1 overflow-y-auto">
+
+            {messages.length === 0 ? (
+
+              <div className="flex flex-1 items-center justify-center px-4">
+                <WelcomeScreen
+                  onSuggestionClick={
+                    handleSendMessage
+                  }
+                />
+              </div>
+
+            ) : (
+
+              <ChatMessages
+                messages={messages}
+                isLoading={isLoading}
+              />
+
+            )}
+
+          </div>
+
+
+          {/* Input */}
+          <div className="border-t border-white/10 bg-black p-4 sm:p-6">
+
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+            />
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(conversationToDelete)}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
+
     </main>
   );
 }
+
 
 export default App;

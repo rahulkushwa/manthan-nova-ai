@@ -27,3 +27,13 @@ body {
     radial-gradient(circle at 85% 90%, rgba(212, 175, 55, 0.05), transparent 30%),
     #050505;
 }
+
+/* Hide scrollbars but keep scrolling functional */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

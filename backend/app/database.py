@@ -1,19 +1,16 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from urllib.parse import quote_plus
 import os
 
-POSTGRES_PASSWORD = "Manthan@3655"
-
-if not POSTGRES_PASSWORD:
-    raise RuntimeError("POSTGRES_PASSWORD environment variable is not set")
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 
-DATABASE_URL = (
-    "postgresql+psycopg://postgres:"
-    + quote_plus(POSTGRES_PASSWORD)
-    + "@localhost:5432/manthan_ai"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set"
+    )
 
 
 engine = create_engine(

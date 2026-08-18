@@ -23,11 +23,16 @@ app = FastAPI(
 )
 
 
+# ==========================================
+# CORS CONFIGURATION
+# ==========================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://manthan-nova-ai-web.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -111,6 +116,7 @@ def get_messages(
         "messages": messages,
     }
 
+
 # ==========================================
 # DELETE ONE CONVERSATION
 # ==========================================
@@ -140,6 +146,7 @@ def delete_user_conversation(
         "conversation_id": conversation_id,
     }
 
+
 # ==========================================
 # AI TUTOR
 # ==========================================
@@ -154,7 +161,6 @@ def tutor(
 ):
     try:
         # Create the conversation if it does not exist
-        # for this specific user.
         if not conversation_exists(
             db=db,
             conversation_id=request.conversation_id,
@@ -167,13 +173,13 @@ def tutor(
                 title=request.question[:100],
             )
 
-        # Load previous messages.
+        # Load previous messages
         history = get_history(
             db=db,
             conversation_id=request.conversation_id,
         )
 
-        # Ask the AI.
+        # Ask the AI
         answer = solve_doubt(
             question=request.question,
             class_level=request.class_level,
@@ -182,7 +188,7 @@ def tutor(
             history=history,
         )
 
-        # Save both sides of the conversation.
+        # Save user message
         add_message(
             db,
             request.conversation_id,
@@ -190,6 +196,7 @@ def tutor(
             request.question,
         )
 
+        # Save AI response
         add_message(
             db,
             request.conversation_id,

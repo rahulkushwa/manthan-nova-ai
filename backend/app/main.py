@@ -205,6 +205,10 @@ def tutor(
     except Exception as error:
         db.rollback()
 
+        print("\n========== AI TUTOR ERROR ==========")
+        print(repr(error))
+        print("====================================\n")
+
         raise HTTPException(
             status_code=500,
             detail=f"AI tutor error: {str(error)}",
